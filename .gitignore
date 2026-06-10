@@ -219,3 +219,10 @@ __marimo__/
 
 # Claude Code local settings
 .claude/
+
+
+# Secrets
+**/secrets/
+**/firebase-admin-key.json
+**/*.env
+**/.env.local
