@@ -1,0 +1,100 @@
+{
+  "brand": {
+    "name": "ZeroDrive",
+    "tagline": "Your files. Everywhere. Free.",
+    "logoLetter": "Z"
+  },
+  "auth": {
+    "features": [
+      "Unlimited storage",
+      "End-to-end encrypted",
+      "Access from anywhere"
+    ],
+    "signin": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your ZeroDrive account",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "button": "Sign in",
+      "switchText": "Don't have an account?",
+      "switchLink": "Create one"
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Free, unlimited storage. No credit card required.",
+      "nameLabel": "Full name",
+      "emailLabel": "Email",
+      "passwordLabel": "Password",
+      "confirmLabel": "Confirm password",
+      "button": "Get started",
+      "switchText": "Already have an account?",
+      "switchLink": "Sign in"
+    },
+    "validation": {
+      "nameRequired": "Full name is required",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordRequired": "Password is required",
+      "confirmRequired": "Please confirm your password",
+      "passwordMismatch": "Passwords do not match"
+    },
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "navbar": {
+    "searchPlaceholder": "Search your files...",
+    "greeting": "Hi",
+    "menu": {
+      "editProfile": "Edit profile",
+      "changePassword": "Change password",
+      "signOut": "Sign out"
+    }
+  },
+  "sidebar": {
+    "myDrive": "My Drive",
+    "recent": "Recent",
+    "starred": "Starred",
+    "trash": "Trash",
+    "storageLabel": "Storage",
+    "storageInfo": "0 GB of unlimited"
+  },
+  "dashboard": {
+    "heading": "My Drive",
+    "newButton": "New",
+    "emptyState": {
+      "title": "Your drive is empty",
+      "subtitle": "Upload files or create a folder to get started",
+      "buttonFile": "Upload file",
+      "buttonFolder": "New folder"
+    },
+    "actions": {
+      "download": "Download",
+      "rename": "Rename",
+      "star": "Star",
+      "trash": "Move to trash"
+    },
+    "columns": {
+      "name": "Name",
+      "modified": "Modified",
+      "size": "Size",
+      "actions": "Actions"
+    },
+    "emptySize": "--"
+  },
+  "chatbot": {
+    "title": "ZeroDrive AI",
+    "subtitle": "Find and manage your files with AI",
+    "placeholder": "Ask anything about your files...",
+    "emptyState": "Ask me to find files, rename them, or tell you what you uploaded recently.",
+    "mockReply": "I'm still learning. File search is coming soon."
+  },
+  "footer": {
+    "tagline": "Unlimited free cloud storage, powered by Telegram.",
+    "links": [
+      { "label": "Privacy", "href": "#" },
+      { "label": "Terms", "href": "#" },
+      { "label": "GitHub", "href": "https://github.com/Vikram739/ZeroDrive" }
+    ],
+    "copy": "2025 ZeroDrive. All rights reserved."
+  }
+}
