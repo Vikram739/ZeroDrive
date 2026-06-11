@@ -3,7 +3,7 @@ import content from '../../config/content.json'
 
 export default function AuthBrandPanel() {
   return (
-    <div className="hidden flex-col justify-between bg-zinc-900 p-16 dark:bg-zinc-100 lg:flex">
+    <div className="flex flex-1 flex-col justify-between bg-zinc-900 p-10 dark:bg-zinc-100 lg:p-16">
       <div className="flex items-center gap-2.5">
         <div className="flex h-9 w-9 items-center justify-center rounded-md bg-white dark:bg-zinc-900">
           <span className="text-lg font-bold text-zinc-900 dark:text-white">

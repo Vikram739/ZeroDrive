@@ -68,6 +68,17 @@ export function AuthProvider({ children }) {
     setUser(null)
   }
 
+  const refreshUser = async () => {
+    try {
+      const profile = await getCurrentUserProfile()
+      setUser((prev) =>
+        prev ? { ...prev, storage_used_bytes: profile.storage_used_bytes ?? 0 } : prev
+      )
+    } catch {
+      // silently ignore
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -80,6 +91,7 @@ export function AuthProvider({ children }) {
         signIn,
         signInWithGoogle,
         signOut,
+        refreshUser,
       }}
     >
       {children}

@@ -17,7 +17,9 @@
       "passwordLabel": "Password",
       "button": "Sign in",
       "switchText": "Don't have an account?",
-      "switchLink": "Create one"
+      "switchLink": "Create one",
+      "forgotPassword": "Forgot password?",
+      "googleButton": "Continue with Google"
     },
     "signup": {
       "title": "Create your account",
@@ -28,7 +30,8 @@
       "confirmLabel": "Confirm password",
       "button": "Get started",
       "switchText": "Already have an account?",
-      "switchLink": "Sign in"
+      "switchLink": "Sign in",
+      "googleButton": "Sign up with Google"
     },
     "validation": {
       "nameRequired": "Full name is required",
@@ -59,6 +62,7 @@
   "navbar": {
     "searchPlaceholder": "Search your files...",
     "greeting": "Hi",
+    "noResults": "No results",
     "menu": {
       "editProfile": "Edit profile",
       "changePassword": "Change password",
@@ -80,16 +84,23 @@
       "title": "Your drive is empty",
       "subtitle": "Upload files or create a folder to get started",
       "buttonFile": "Upload file",
-      "buttonFolder": "New folder"
+      "buttonFolder": "New folder",
+      "buttonUploadFolder": "Upload folder"
     },
     "emptyOtherTitle": "Nothing here yet",
+    "breadcrumb": {
+      "root": "My Drive"
+    },
     "actions": {
       "open": "Open",
       "download": "Download",
+      "downloadFolder": "Download as zip",
       "rename": "Rename",
       "star": "Star",
       "unstar": "Unstar",
-      "trash": "Move to trash"
+      "trash": "Move to trash",
+      "restore": "Restore",
+      "deletePermanent": "Delete permanently"
     },
     "columns": {
       "name": "Name",
@@ -98,6 +109,7 @@
       "actions": "Actions"
     },
     "emptySize": "--",
+    "emptyTrash": "Empty trash",
     "dialogs": {
       "newFolder": {
         "title": "Create new folder",
@@ -115,12 +127,25 @@
         "subtitle": "You can restore it from the trash later.",
         "cancel": "Cancel",
         "confirm": "Move to trash"
+      },
+      "confirmDeletePermanent": {
+        "title": "Delete permanently?",
+        "subtitle": "This cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Delete permanently"
+      },
+      "emptyTrash": {
+        "title": "Empty trash?",
+        "subtitle": "All items will be permanently deleted. This cannot be undone.",
+        "cancel": "Cancel",
+        "confirm": "Empty trash"
       }
     },
     "upload": {
       "uploading": "Uploading...",
       "complete": "Upload complete",
-      "failed": "Upload failed"
+      "failed": "Upload failed",
+      "folderProgress": "Uploaded {current} of {total} files"
     },
     "toast": {
       "folderCreated": "Folder created",
@@ -143,6 +168,6 @@
       { "label": "Terms", "href": "#" },
       { "label": "GitHub", "href": "https://github.com/Vikram739/ZeroDrive" }
     ],
-    "copy": "2025 ZeroDrive. All rights reserved."
+    "copy": "2026 ZeroDrive. All rights reserved."
   }
 }

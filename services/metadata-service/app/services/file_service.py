@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from google.cloud.firestore_v1 import FieldFilter, Query
+from google.cloud.firestore_v1 import FieldFilter
 
 from app.core.firebase import get_firestore_client
 from app.models.schemas import (
@@ -84,6 +84,15 @@ class FileService:
     def _collection(self, user_id: str):
         return self._db.collection("users").document(user_id).collection("files")
 
+    def _adjust_storage(self, user_id: str, delta: int) -> None:
+        user_ref = self._db.collection("users").document(user_id)
+        try:
+            doc = user_ref.get()
+            current = doc.to_dict().get("storage_used_bytes", 0) if doc.exists else 0
+            user_ref.set({"storage_used_bytes": max(0, current + delta)}, merge=True)
+        except Exception as exc:
+            logger.warning("storage update failed user=%s: %s", user_id, exc)
+
     def create(self, user_id: str, file_data: FileCreate) -> FileResponse:
         file_id = str(uuid.uuid4())
         now = _now()
@@ -105,6 +114,7 @@ class FileService:
         }
         _file_ref(self._db, user_id, file_id).set(data)
         logger.info("Created file id=%s user=%s name=%s", file_id, user_id, file_data.name)
+        self._adjust_storage(user_id, file_data.size_bytes)
         return FileResponse(**data)
 
     def get(self, user_id: str, file_id: str) -> Optional[FileResponse]:
@@ -161,8 +171,10 @@ class FileService:
                 detail="Move file to trash before permanently deleting",
             )
         message_ids = data.get("telegram_message_ids", [])
+        size_bytes = data.get("size_bytes", 0)
         ref.delete()
         logger.info("Permanently deleted file id=%s user=%s", file_id, user_id)
+        self._adjust_storage(user_id, -size_bytes)
         return {"telegram_message_ids": message_ids}
 
     def list_trash(self, user_id: str) -> ListResponse:
@@ -230,13 +242,43 @@ class FileService:
         ]
         return ListResponse(folders=folders, files=files)
 
-    def get_recent(self, user_id: str, limit: int = 20) -> ListResponse:
-        files = [
+    def get_recent(self, user_id: str) -> ListResponse:
+        all_files = [
             _doc_to_file(doc)
             for doc in self._collection(user_id)
             .where(filter=FieldFilter("is_trashed", "==", False))
-            .order_by("updated_at", direction=Query.DESCENDING)
-            .limit(limit)
             .stream()
         ]
-        return ListResponse(folders=[], files=files)
+        all_folders = [
+            _doc_to_folder(doc)
+            for doc in self._db.collection("users")
+            .document(user_id)
+            .collection("folders")
+            .where(filter=FieldFilter("is_trashed", "==", False))
+            .stream()
+        ]
+        recent_files = sorted(all_files, key=lambda f: f.updated_at, reverse=True)[:20]
+        recent_folders = sorted(all_folders, key=lambda f: f.updated_at, reverse=True)[:10]
+        return ListResponse(folders=recent_folders, files=recent_files)
+
+    def search(self, user_id: str, query: str) -> ListResponse:
+        q = query.lower().strip()
+        if not q:
+            return ListResponse(folders=[], files=[])
+        all_files = [
+            _doc_to_file(doc)
+            for doc in self._collection(user_id)
+            .where(filter=FieldFilter("is_trashed", "==", False))
+            .stream()
+        ]
+        all_folders = [
+            _doc_to_folder(doc)
+            for doc in self._db.collection("users")
+            .document(user_id)
+            .collection("folders")
+            .where(filter=FieldFilter("is_trashed", "==", False))
+            .stream()
+        ]
+        matched_files = [f for f in all_files if q in f.name.lower()]
+        matched_folders = [f for f in all_folders if q in f.name.lower()]
+        return ListResponse(folders=matched_folders, files=matched_files)

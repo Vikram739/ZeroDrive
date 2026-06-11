@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Plus,
   Upload,
@@ -17,10 +18,30 @@ import {
   Trash2,
   Loader,
   X,
+  RotateCcw,
+  ArrowLeft,
 } from 'lucide-react'
 import content from '../config/content.json'
 import { useFiles } from '../hooks/useFiles'
-import { downloadFile, getRecent, getStarred, getTrash } from '../services/fileService'
+import {
+  downloadFile,
+  downloadFolderAsZip,
+  getRecent,
+  getStarred,
+  getTrash,
+  restoreFile,
+  restoreFolder,
+  deleteFile,
+  deleteFolder,
+  emptyTrash as emptyTrashApi,
+  getFolder,
+  uploadFile as uploadFileApi,
+  createFolder as createFolderApi,
+  updateFile,
+  updateFolder,
+} from '../services/fileService'
+import { useAuth } from '../context/AuthContext'
+import DropdownMenu, { DropdownMenuItem } from '../components/ui/DropdownMenu'
 import NewFolderDialog from '../components/dialogs/NewFolderDialog'
 import RenameDialog from '../components/dialogs/RenameDialog'
 import ConfirmDialog from '../components/dialogs/ConfirmDialog'
@@ -77,191 +98,151 @@ function FileIcon({ item, size = 40 }) {
   }
 }
 
-function FileActionsMenu({ item, onOpen, onDownload, onRename, onStar, onTrash, openUp = false }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+function FileActionsMenu({ item, onAction }) {
   const folder = isFolder(item)
 
-  useEffect(() => {
-    if (!open) return undefined
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const actions = folder
-    ? [
-        { label: c.actions.open, icon: Folder, onClick: onOpen },
-        { label: c.actions.rename, icon: Pencil, onClick: onRename },
-        { label: item.is_starred ? c.actions.unstar : c.actions.star, icon: Star, onClick: onStar },
-        { label: c.actions.trash, icon: Trash2, onClick: onTrash, danger: true },
-      ]
-    : [
-        { label: c.actions.download, icon: Download, onClick: onDownload },
-        { label: c.actions.rename, icon: Pencil, onClick: onRename },
-        { label: item.is_starred ? c.actions.unstar : c.actions.star, icon: Star, onClick: onStar },
-        { label: c.actions.trash, icon: Trash2, onClick: onTrash, danger: true },
-      ]
+  let actions
+  if (item.is_trashed) {
+    actions = [
+      { label: c.actions.restore, icon: RotateCcw, onClick: () => onAction('restore', item) },
+      { label: c.actions.deletePermanent, icon: Trash2, onClick: () => onAction('deletePermanent', item), danger: true },
+    ]
+  } else if (folder) {
+    actions = [
+      { label: c.actions.open, icon: Folder, onClick: () => onAction('open', item) },
+      { label: c.actions.downloadFolder, icon: Download, onClick: () => onAction('download', item) },
+      { label: c.actions.rename, icon: Pencil, onClick: () => onAction('rename', item) },
+      { label: item.is_starred ? c.actions.unstar : c.actions.star, icon: Star, onClick: () => onAction('star', item) },
+      { label: c.actions.trash, icon: Trash2, onClick: () => onAction('trash', item), danger: true },
+    ]
+  } else {
+    actions = [
+      { label: c.actions.download, icon: Download, onClick: () => onAction('download', item) },
+      { label: c.actions.rename, icon: Pencil, onClick: () => onAction('rename', item) },
+      { label: item.is_starred ? c.actions.unstar : c.actions.star, icon: Star, onClick: () => onAction('star', item) },
+      { label: c.actions.trash, icon: Trash2, onClick: () => onAction('trash', item), danger: true },
+    ]
+  }
 
   return (
-    <div className="relative" ref={ref}>
+    <DropdownMenu label={item.name} itemCount={actions.length} trigger={({ open, toggle }) => (
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen((p) => !p) }}
+        onClick={toggle}
         aria-label="Item actions"
-        className="rounded-md p-1.5 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        className={`rounded-md p-1.5 transition-colors active:opacity-70 ${
+          open
+            ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
+            : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+        }`}
       >
         <MoreVertical size={16} />
       </button>
-      {open && (
-        <div
-          className={`absolute right-0 z-10 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-800 dark:bg-zinc-950 ${
-            openUp ? 'bottom-full mb-1' : 'mt-1'
-          }`}
-        >
-          {actions.map((action) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={action.label}
-                type="button"
-                onClick={() => { setOpen(false); action.onClick?.() }}
-                className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-900 ${
-                  action.danger
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-zinc-700 dark:text-zinc-300'
-                }`}
-              >
-                <Icon size={15} />
-                {action.label}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
+    )}>
+      {actions.map((a) => (
+        <DropdownMenuItem key={a.label} label={a.label} icon={a.icon} onClick={a.onClick} danger={a.danger} />
+      ))}
+    </DropdownMenu>
   )
 }
 
-function AddMenu({ variant = 'button', onUploadClick, onNewFolder }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+function AddMenu({ variant = 'button', onUploadClick, onUploadFolderClick, onNewFolder }) {
   const copy = c.emptyState
-
-  useEffect(() => {
-    if (!open) return undefined
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
   const options = [
     { label: copy.buttonFile, icon: Upload, onClick: onUploadClick },
+    { label: copy.buttonUploadFolder, icon: FolderPlus, onClick: onUploadFolderClick },
     { label: copy.buttonFolder, icon: FolderPlus, onClick: onNewFolder },
   ]
 
   return (
-    <div className="relative inline-block" ref={ref}>
-      {variant === 'circle' ? (
+    <DropdownMenu label={c.newButton} itemCount={3} trigger={({ open, toggle }) =>
+      variant === 'circle' ? (
         <button
           type="button"
-          onClick={() => setOpen((p) => !p)}
+          onClick={toggle}
           aria-label={copy.buttonFile}
-          className="flex h-[88px] w-[88px] items-center justify-center rounded-full border-2 border-zinc-900 text-zinc-900 transition-colors hover:bg-zinc-100 dark:border-zinc-50 dark:text-zinc-50 dark:hover:bg-zinc-900"
+          className="flex h-[88px] w-[88px] items-center justify-center rounded-full border-2 border-zinc-900 text-zinc-900 transition-colors hover:bg-zinc-100 active:opacity-70 dark:border-zinc-50 dark:text-zinc-50 dark:hover:bg-zinc-900"
         >
           <Plus size={32} />
         </button>
       ) : (
         <button
           type="button"
-          onClick={() => setOpen((p) => !p)}
-          className="flex items-center gap-2 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          onClick={toggle}
+          className={`flex items-center gap-2 rounded-md bg-zinc-900 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 active:bg-zinc-700 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200 ${
+            open ? 'ring-2 ring-zinc-900/20 dark:ring-zinc-50/20' : ''
+          }`}
         >
           <Plus size={16} />
           {c.newButton}
         </button>
-      )}
-      {open && (
-        <div
-          className={`absolute z-10 mt-2 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-800 dark:bg-zinc-950 ${
-            variant === 'circle' ? 'left-1/2 -translate-x-1/2' : 'right-0'
-          }`}
-        >
-          {options.map((opt) => {
-            const Icon = opt.icon
-            return (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => { setOpen(false); opt.onClick?.() }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
-              >
-                <Icon size={15} />
-                {opt.label}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
+      )
+    }>
+      {options.map((opt) => (
+        <DropdownMenuItem key={opt.label} label={opt.label} icon={opt.icon} onClick={opt.onClick} />
+      ))}
+    </DropdownMenu>
   )
 }
 
-function EmptyState({ onUploadClick, onNewFolder }) {
+function EmptyState({ onUploadClick, onUploadFolderClick, onNewFolder }) {
   const copy = c.emptyState
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center">
-      <AddMenu variant="circle" onUploadClick={onUploadClick} onNewFolder={onNewFolder} />
+      <AddMenu variant="circle" onUploadClick={onUploadClick} onUploadFolderClick={onUploadFolderClick} onNewFolder={onNewFolder} />
       <h2 className="mt-8 text-xl font-semibold text-zinc-900 dark:text-zinc-50">{copy.title}</h2>
       <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{copy.subtitle}</p>
     </div>
   )
 }
 
-function GridView({ folders, files, onAction }) {
+function GridView({ folders, files, onAction, draggedItem, onDragStart, onDragEnd, onDragOver, onDrop }) {
   const items = [
     ...folders.map((f) => ({ ...f, _kind: 'folder' })),
     ...files.map((f) => ({ ...f, _kind: 'file' })),
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      {items.map((item, idx) => (
-        <div
-          key={item.id}
-          className="group relative flex flex-col items-center rounded-lg border border-zinc-200 p-4 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-        >
-          <div className="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-            <FileActionsMenu
-              item={item}
-              onOpen={() => onAction('open', item)}
-              onDownload={() => onAction('download', item)}
-              onRename={() => onAction('rename', item)}
-              onStar={() => onAction('star', item)}
-              onTrash={() => onAction('trash', item)}
-              openUp={idx >= items.length - 3}
-            />
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-5">
+      {items.map((item) => {
+        const canDrop = isFolder(item) && draggedItem && draggedItem.id !== item.id
+        return (
+          <div
+            key={item.id}
+            draggable={!item.is_trashed}
+            onDragStart={() => onDragStart(item)}
+            onDragEnd={onDragEnd}
+            onDragOver={canDrop ? (e) => onDragOver(e) : undefined}
+            onDrop={canDrop ? (e) => onDrop(e, item) : undefined}
+            onClick={() => { if (isFolder(item) && !item.is_trashed) onAction('open', item) }}
+            className={`group relative flex flex-col items-center rounded-lg border p-3 transition-colors sm:p-4 ${
+              isFolder(item) && !item.is_trashed ? 'cursor-pointer' : ''
+            } ${
+              canDrop
+                ? 'border-zinc-900 bg-zinc-50 dark:border-zinc-400 dark:bg-zinc-900'
+                : 'border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:border-zinc-700 dark:hover:bg-zinc-900'
+            }`}
+          >
+            <div className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              <FileActionsMenu item={item} onAction={onAction} />
+            </div>
+            <div className="flex h-12 items-center justify-center sm:h-14 md:h-16">
+              <FileIcon item={item} size={36} />
+            </div>
+            <p className="mt-2 w-full truncate text-center text-xs font-medium text-zinc-900 dark:text-zinc-50 sm:text-sm">
+              {item.name}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+              {formatDate(item.updated_at)}
+            </p>
           </div>
-          <div className="flex h-16 items-center justify-center">
-            <FileIcon item={item} />
-          </div>
-          <p className="mt-2 w-full truncate text-center text-sm font-medium text-zinc-900 dark:text-zinc-50">
-            {item.name}
-          </p>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            {formatDate(item.updated_at)}
-          </p>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
-function ListView({ folders, files, onAction }) {
+function ListView({ folders, files, onAction, draggedItem, onDragStart, onDragEnd, onDragOver, onDrop }) {
   const items = [
     ...folders.map((f) => ({ ...f, _kind: 'folder' })),
     ...files.map((f) => ({ ...f, _kind: 'file' })),
@@ -272,70 +253,83 @@ function ListView({ folders, files, onAction }) {
       <table className="w-full text-left text-sm">
         <thead className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
           <tr>
-            <th className="px-4 py-3 font-medium">{c.columns.name}</th>
-            <th className="px-4 py-3 font-medium">{c.columns.modified}</th>
-            <th className="hidden px-4 py-3 font-medium sm:table-cell">{c.columns.size}</th>
-            <th className="px-4 py-3">
-              <span className="sr-only">{c.columns.actions}</span>
-            </th>
+            <th className="px-3 py-3 font-medium sm:px-4">{c.columns.name}</th>
+            <th className="hidden px-4 py-3 font-medium sm:table-cell">{c.columns.modified}</th>
+            <th className="hidden px-4 py-3 font-medium md:table-cell">{c.columns.size}</th>
+            <th className="px-3 py-3 sm:px-4"><span className="sr-only">{c.columns.actions}</span></th>
           </tr>
         </thead>
         <tbody>
-          {items.map((item, idx) => (
-            <tr
-              key={item.id}
-              className={`hover:bg-zinc-50 dark:hover:bg-zinc-900 ${
-                idx !== items.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-800' : ''
-              }`}
-            >
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <FileIcon item={item} size={20} />
-                  <span className="font-medium text-zinc-900 dark:text-zinc-50">{item.name}</span>
-                </div>
-              </td>
-              <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">
-                {formatDate(item.updated_at)}
-              </td>
-              <td className="hidden px-4 py-3 text-zinc-500 dark:text-zinc-400 sm:table-cell">
-                {isFolder(item) ? c.emptySize : formatBytes(item.size_bytes)}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <div className="flex justify-end">
-                  <FileActionsMenu
-                    item={item}
-                    onOpen={() => onAction('open', item)}
-                    onDownload={() => onAction('download', item)}
-                    onRename={() => onAction('rename', item)}
-                    onStar={() => onAction('star', item)}
-                    onTrash={() => onAction('trash', item)}
-                    openUp={idx >= items.length - 2}
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
+          {items.map((item, idx) => {
+            const canDrop = isFolder(item) && draggedItem && draggedItem.id !== item.id
+            return (
+              <tr
+                key={item.id}
+                draggable={!item.is_trashed}
+                onDragStart={() => onDragStart(item)}
+                onDragEnd={onDragEnd}
+                onDragOver={canDrop ? (e) => onDragOver(e) : undefined}
+                onDrop={canDrop ? (e) => onDrop(e, item) : undefined}
+                onClick={() => { if (isFolder(item) && !item.is_trashed) onAction('open', item) }}
+                className={`${isFolder(item) && !item.is_trashed ? 'cursor-pointer' : ''} ${
+                  canDrop ? 'bg-zinc-50 dark:bg-zinc-900' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                } ${idx !== items.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-800' : ''}`}
+              >
+                <td className="px-3 py-3 sm:px-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <FileIcon item={item} size={18} />
+                    <span className="max-w-[140px] truncate font-medium text-zinc-900 dark:text-zinc-50 sm:max-w-xs">{item.name}</span>
+                  </div>
+                </td>
+                <td className="hidden px-4 py-3 text-zinc-500 dark:text-zinc-400 sm:table-cell">
+                  {formatDate(item.updated_at)}
+                </td>
+                <td className="hidden px-4 py-3 text-zinc-500 dark:text-zinc-400 md:table-cell">
+                  {isFolder(item) ? c.emptySize : formatBytes(item.size_bytes)}
+                </td>
+                <td className="px-3 py-3 text-right sm:px-4">
+                  <div className="flex justify-end">
+                    <FileActionsMenu item={item} onAction={onAction} />
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
 }
 
-export default function Dashboard({ view = 'myDrive' }) {
+export default function Dashboard({ view = 'myDrive', folderId = null }) {
+  const { refreshUser } = useAuth()
+  const navigate = useNavigate()
   const fileInputRef = useRef(null)
-  const filesHook = useFiles(null)
+  const folderInputRef = useRef(null)
+  const filesHook = useFiles(view === 'myDrive' ? folderId : null)
 
   const [viewData, setViewData] = useState({ folders: [], files: [] })
-
+  const [folderName, setFolderName] = useState(null)
   const [uploadList, setUploadList] = useState([])
   const [displayMode, setDisplayMode] = useState('grid')
+  const [draggedItem, setDraggedItem] = useState(null)
 
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [showRename, setShowRename] = useState(false)
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
+  const [showConfirmPermanent, setShowConfirmPermanent] = useState(false)
+  const [showConfirmEmptyTrash, setShowConfirmEmptyTrash] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
-
   const [errorMsg, setErrorMsg] = useState(null)
+
+  useEffect(() => {
+    if (view !== 'myDrive' || !folderId) return undefined
+    let active = true
+    getFolder(folderId)
+      .then((data) => { if (active && data) setFolderName(data.name) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [view, folderId])
 
   useEffect(() => {
     if (view === 'myDrive') return undefined
@@ -358,10 +352,11 @@ export default function Dashboard({ view = 'myDrive' }) {
   const displayFolders = view === 'myDrive' ? filesHook.folders : (viewData.folders ?? [])
   const displayFiles = view === 'myDrive' ? filesHook.files : (viewData.files ?? [])
   const loading = view === 'myDrive' ? filesHook.loading : false
+  const isMyDrive = view === 'myDrive'
+  const isEmpty = displayFolders.length === 0 && displayFiles.length === 0
 
-  function handleUploadClick() {
-    fileInputRef.current?.click()
-  }
+  function handleUploadClick() { fileInputRef.current?.click() }
+  function handleUploadFolderClick() { folderInputRef.current?.click() }
 
   async function handleFileChange(e) {
     const picked = Array.from(e.target.files || [])
@@ -371,13 +366,75 @@ export default function Dashboard({ view = 'myDrive' }) {
       setUploadList((prev) => [...prev, { id, filename: file.name, progress: 0, status: 'uploading' }])
       try {
         await filesHook.uploadFile(file, (p) => {
-          setUploadList((prev) => prev.map((u) => (u.id === id ? { ...u, progress: p } : u)))
+          setUploadList((prev) => prev.map((u) => (u.id === id ? { ...u, ...p } : u)))
         })
         setUploadList((prev) => prev.map((u) => (u.id === id ? { ...u, progress: 100, status: 'complete' } : u)))
+        refreshUser()
       } catch (err) {
         setUploadList((prev) => prev.map((u) => (u.id === id ? { ...u, status: 'failed' } : u)))
         setErrorMsg(err.message)
       }
+    }
+  }
+
+  async function handleFolderChange(e) {
+    const allFiles = Array.from(e.target.files || [])
+    e.target.value = ''
+    if (!allFiles.length) return
+
+    const rootName = allFiles[0].webkitRelativePath.split('/')[0]
+    const folderIdMap = new Map()
+    const folderPaths = []
+
+    for (const file of allFiles) {
+      const parts = file.webkitRelativePath.split('/')
+      for (let depth = 1; depth < parts.length; depth++) {
+        const p = parts.slice(0, depth).join('/')
+        if (!folderIdMap.has(p)) {
+          folderIdMap.set(p, null)
+          folderPaths.push(p)
+        }
+      }
+    }
+
+    const uploadId = crypto.randomUUID()
+    setUploadList((prev) => [
+      ...prev,
+      { id: uploadId, filename: `${rootName}/`, progress: 0, status: 'uploading', currentFile: 0, totalFiles: allFiles.length, isFolder: true },
+    ])
+
+    try {
+      for (const folderPath of folderPaths) {
+        const parts = folderPath.split('/')
+        const name = parts[parts.length - 1]
+        const parentPath = parts.length > 1 ? parts.slice(0, -1).join('/') : null
+        const parentId = parentPath ? folderIdMap.get(parentPath) : folderId
+        const created = await createFolderApi(name, parentId)
+        folderIdMap.set(folderPath, created.id)
+      }
+
+      let done = 0
+      for (const file of allFiles) {
+        const parts = file.webkitRelativePath.split('/')
+        const parentPath = parts.slice(0, -1).join('/')
+        const targetId = folderIdMap.get(parentPath) ?? folderId
+        await uploadFileApi(file, targetId, () => {})
+        done++
+        setUploadList((prev) =>
+          prev.map((u) =>
+            u.id === uploadId
+              ? { ...u, progress: Math.round((done / allFiles.length) * 100), currentFile: done }
+              : u
+          )
+        )
+      }
+
+      setUploadList((prev) => prev.map((u) => (u.id === uploadId ? { ...u, progress: 100, status: 'complete' } : u)))
+      filesHook.refresh()
+      refreshUser()
+    } catch (err) {
+      setUploadList((prev) => prev.map((u) => (u.id === uploadId ? { ...u, status: 'failed' } : u)))
+      setErrorMsg(err.message)
     }
   }
 
@@ -390,12 +447,39 @@ export default function Dashboard({ view = 'myDrive' }) {
     }
   }
 
+  function handleDragStart(item) { setDraggedItem(item) }
+  function handleDragEnd() { setDraggedItem(null) }
+  function handleDragOver(e) { e.preventDefault() }
+
+  async function handleDrop(e, targetFolder) {
+    e.preventDefault()
+    if (!draggedItem) return
+    setDraggedItem(null)
+    try {
+      if (isFolder(draggedItem)) {
+        await updateFolder(draggedItem.id, { parent_id: targetFolder.id })
+      } else {
+        await updateFile(draggedItem.id, { folder_id: targetFolder.id })
+      }
+      filesHook.refresh()
+    } catch (err) {
+      setErrorMsg(err.message)
+    }
+  }
+
   const handleAction = useCallback(
     async (action, item) => {
-      if (action === 'open') return
+      if (action === 'open') {
+        navigate(`/dashboard/folder/${item.id}`)
+        return
+      }
       if (action === 'download') {
         try {
-          await downloadFile(item.id, item.name)
+          if (isFolder(item)) {
+            await downloadFolderAsZip(item.id, item.name)
+          } else {
+            await downloadFile(item.id, item.name)
+          }
         } catch (err) {
           setErrorMsg(err.message)
         }
@@ -407,19 +491,36 @@ export default function Dashboard({ view = 'myDrive' }) {
         return
       }
       if (action === 'star') {
-        try {
-          await filesHook.starItem(item)
-        } catch (err) {
-          setErrorMsg(err.message)
-        }
+        try { await filesHook.starItem(item) } catch (err) { setErrorMsg(err.message) }
         return
       }
       if (action === 'trash') {
         setSelectedItem(item)
         setShowConfirmDelete(true)
+        return
+      }
+      if (action === 'restore') {
+        try {
+          if (isFolder(item)) {
+            await restoreFolder(item.id)
+          } else {
+            await restoreFile(item.id)
+          }
+          setViewData((prev) => ({
+            folders: prev.folders.filter((f) => f.id !== item.id),
+            files: prev.files.filter((f) => f.id !== item.id),
+          }))
+        } catch (err) {
+          setErrorMsg(err.message)
+        }
+        return
+      }
+      if (action === 'deletePermanent') {
+        setSelectedItem(item)
+        setShowConfirmPermanent(true)
       }
     },
-    [filesHook],
+    [filesHook, navigate],
   )
 
   async function handleSaveRename(newName) {
@@ -451,73 +552,149 @@ export default function Dashboard({ view = 'myDrive' }) {
     }
   }
 
+  async function handleConfirmPermanent() {
+    if (!selectedItem) return
+    try {
+      if (isFolder(selectedItem)) {
+        await deleteFolder(selectedItem.id, true)
+      } else {
+        await deleteFile(selectedItem.id, true)
+      }
+      setViewData((prev) => ({
+        folders: prev.folders.filter((f) => f.id !== selectedItem.id),
+        files: prev.files.filter((f) => f.id !== selectedItem.id),
+      }))
+      setSelectedItem(null)
+      setShowConfirmPermanent(false)
+      refreshUser()
+    } catch (err) {
+      setErrorMsg(err.message)
+    }
+  }
+
+  async function handleEmptyTrash() {
+    try {
+      await emptyTrashApi()
+      setViewData({ folders: [], files: [] })
+      setShowConfirmEmptyTrash(false)
+      refreshUser()
+    } catch (err) {
+      setErrorMsg(err.message)
+    }
+  }
+
   function dismissUpload(id) {
     setUploadList((prev) => prev.filter((u) => u.id !== id))
   }
 
-  const isMyDrive = view === 'myDrive'
-  const isEmpty = displayFolders.length === 0 && displayFiles.length === 0
+  const breadcrumb = folderId ? (
+    <nav className="mb-1 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-50 sm:hidden"
+      >
+        <ArrowLeft size={12} />
+        <span>{c.breadcrumb.root}</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate('/dashboard')}
+        className="hidden hover:text-zinc-900 dark:hover:text-zinc-50 sm:inline"
+      >
+        {c.breadcrumb.root}
+      </button>
+      <span className="hidden sm:inline">/</span>
+      <span className="hidden text-zinc-900 dark:text-zinc-50 sm:inline">{folderName ?? '...'}</span>
+    </nav>
+  ) : null
+
+  const headingText = folderId && folderName ? folderName : VIEW_HEADINGS[view]
+
+  const dragProps = {
+    draggedItem,
+    onDragStart: handleDragStart,
+    onDragEnd: handleDragEnd,
+    onDragOver: handleDragOver,
+    onDrop: handleDrop,
+  }
 
   return (
-    <div className="flex flex-1 lg:pl-60">
-      <main className="flex w-full flex-1 flex-col px-4 py-6 sm:px-6">
+    <>
+      <main className="flex w-full flex-1 flex-col px-3 py-4 sm:px-6 sm:py-6">
         {loading ? (
           <div className="flex flex-1 items-center justify-center">
             <Loader size={28} className="animate-spin text-zinc-400" />
           </div>
-        ) : isEmpty && isMyDrive ? (
-          <EmptyState onUploadClick={handleUploadClick} onNewFolder={() => setShowNewFolder(true)} />
-        ) : isEmpty ? (
-          <div className="flex flex-1 flex-col items-center justify-center py-20 text-center">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">{c.emptyOtherTitle}</p>
-          </div>
+        ) : isEmpty && isMyDrive && !folderId ? (
+          <EmptyState
+            onUploadClick={handleUploadClick}
+            onUploadFolderClick={handleUploadFolderClick}
+            onNewFolder={() => setShowNewFolder(true)}
+          />
         ) : (
           <>
-            <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                {VIEW_HEADINGS[view]}
-              </h1>
-              <div className="flex items-center gap-3">
+            <div className="mb-4 flex items-start justify-between gap-3 sm:mb-6">
+              <div className="min-w-0">
+                {breadcrumb}
+                <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-50 sm:text-xl">{headingText}</h1>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                {view === 'trash' && !isEmpty && (
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmEmptyTrash(true)}
+                    className="flex items-center gap-1.5 rounded-md border border-red-200 px-2.5 py-2 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 active:opacity-70 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 sm:gap-2 sm:px-3.5 sm:text-sm"
+                  >
+                    <Trash2 size={14} />
+                    <span className="hidden sm:inline">{c.emptyTrash}</span>
+                  </button>
+                )}
                 {isMyDrive && (
                   <AddMenu
                     variant="button"
                     onUploadClick={handleUploadClick}
+                    onUploadFolderClick={handleUploadFolderClick}
                     onNewFolder={() => setShowNewFolder(true)}
                   />
                 )}
-                <div className="flex items-center gap-1 rounded-md border border-zinc-200 p-0.5 dark:border-zinc-800">
+                <div className="flex items-center gap-0.5 rounded-md border border-zinc-200 p-0.5 dark:border-zinc-800">
                   <button
                     type="button"
                     onClick={() => setDisplayMode('grid')}
                     aria-label="Grid view"
-                    className={`rounded p-1.5 ${
+                    className={`rounded p-1.5 transition-colors ${
                       displayMode === 'grid'
                         ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
                         : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
                     }`}
                   >
-                    <Grid size={18} />
+                    <Grid size={16} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setDisplayMode('list')}
                     aria-label="List view"
-                    className={`rounded p-1.5 ${
+                    className={`rounded p-1.5 transition-colors ${
                       displayMode === 'list'
                         ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50'
                         : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50'
                     }`}
                   >
-                    <List size={18} />
+                    <List size={16} />
                   </button>
                 </div>
               </div>
             </div>
 
-            {displayMode === 'grid' ? (
-              <GridView folders={displayFolders} files={displayFiles} onAction={handleAction} />
+            {isEmpty ? (
+              <div className="flex flex-1 items-center justify-center py-20">
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{c.emptyOtherTitle}</p>
+              </div>
+            ) : displayMode === 'grid' ? (
+              <GridView folders={displayFolders} files={displayFiles} onAction={handleAction} {...dragProps} />
             ) : (
-              <ListView folders={displayFolders} files={displayFiles} onAction={handleAction} />
+              <ListView folders={displayFolders} files={displayFiles} onAction={handleAction} {...dragProps} />
             )}
           </>
         )}
@@ -527,13 +704,8 @@ export default function Dashboard({ view = 'myDrive' }) {
         )}
       </main>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleFileChange}
-      />
+      <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
+      <input ref={folderInputRef} type="file" webkitdirectory="" className="hidden" onChange={handleFolderChange} />
 
       <NewFolderDialog
         key={showNewFolder ? 'nf-open' : 'nf-closed'}
@@ -560,6 +732,26 @@ export default function Dashboard({ view = 'myDrive' }) {
         onConfirm={handleConfirmTrash}
       />
 
+      <ConfirmDialog
+        isOpen={showConfirmPermanent}
+        onClose={() => { setShowConfirmPermanent(false); setSelectedItem(null) }}
+        title={c.dialogs.confirmDeletePermanent.title}
+        subtitle={c.dialogs.confirmDeletePermanent.subtitle}
+        cancelLabel={c.dialogs.confirmDeletePermanent.cancel}
+        confirmLabel={c.dialogs.confirmDeletePermanent.confirm}
+        onConfirm={handleConfirmPermanent}
+      />
+
+      <ConfirmDialog
+        isOpen={showConfirmEmptyTrash}
+        onClose={() => setShowConfirmEmptyTrash(false)}
+        title={c.dialogs.emptyTrash.title}
+        subtitle={c.dialogs.emptyTrash.subtitle}
+        cancelLabel={c.dialogs.emptyTrash.cancel}
+        confirmLabel={c.dialogs.emptyTrash.confirm}
+        onConfirm={handleEmptyTrash}
+      />
+
       <UploadProgress uploads={uploadList} onDismiss={dismissUpload} />
 
       {errorMsg && (
@@ -574,6 +766,6 @@ export default function Dashboard({ view = 'myDrive' }) {
           </button>
         </div>
       )}
-    </div>
+    </>
   )
 }
