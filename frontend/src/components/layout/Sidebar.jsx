@@ -1,19 +1,29 @@
 import { useEffect, useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { HardDrive, Clock, Star, Trash2, X } from 'lucide-react'
 import content from '../../config/content.json'
+import { useAuth } from '../../context/AuthContext'
 
 const NAV_ITEMS = [
-  { key: 'myDrive', label: content.sidebar.myDrive, icon: HardDrive },
-  { key: 'recent', label: content.sidebar.recent, icon: Clock },
-  { key: 'starred', label: content.sidebar.starred, icon: Star },
-  { key: 'trash', label: content.sidebar.trash, icon: Trash2 }
+  { path: '/dashboard', label: content.sidebar.myDrive, icon: HardDrive, end: true },
+  { path: '/dashboard/recent', label: content.sidebar.recent, icon: Clock, end: false },
+  { path: '/dashboard/starred', label: content.sidebar.starred, icon: Star, end: false },
+  { path: '/dashboard/trash', label: content.sidebar.trash, icon: Trash2, end: false },
 ]
 
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 function StorageMeter() {
+  const { user } = useAuth()
+  const used = user?.storage_used_bytes ?? 0
   const radius = 28
   const circumference = 2 * Math.PI * radius
-  const percent = 0
-  const offset = circumference - (percent / 100) * circumference
 
   return (
     <div className="border-t border-zinc-200 px-5 py-5 dark:border-zinc-800">
@@ -39,42 +49,46 @@ function StorageMeter() {
               strokeWidth="6"
               strokeLinecap="round"
               strokeDasharray={circumference}
-              strokeDashoffset={offset}
+              strokeDashoffset={circumference}
               className="stroke-zinc-900 dark:stroke-zinc-50"
             />
           </svg>
           <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-zinc-900 dark:text-zinc-50">
-            {percent}%
+            0%
           </span>
         </div>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          {content.sidebar.storageInfo}
+          {formatBytes(used)} {content.sidebar.storageInfo}
         </p>
       </div>
     </div>
   )
 }
 
-function SidebarNav({ active, setActive }) {
+function SidebarNav() {
+  const activeClass =
+    'border-zinc-900 bg-zinc-100 text-zinc-900 dark:border-zinc-50 dark:bg-zinc-900 dark:text-zinc-50'
+  const inactiveClass =
+    'border-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50'
+
   return (
     <nav className="flex-1 space-y-1 px-3 py-4">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon
-        const isActive = active === item.key
         return (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setActive(item.key)}
-            className={`flex w-full items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-sm font-medium transition-colors ${
-              isActive
-                ? 'border-zinc-900 bg-zinc-100 text-zinc-900 dark:border-zinc-50 dark:bg-zinc-900 dark:text-zinc-50'
-                : 'border-transparent text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50'
-            }`}
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.end}
+            className={({ isActive }) =>
+              `flex w-full items-center gap-3 rounded-md border-l-[3px] px-3 py-2 text-sm font-medium transition-colors ${
+                isActive ? activeClass : inactiveClass
+              }`
+            }
           >
             <Icon size={18} />
             {item.label}
-          </button>
+          </NavLink>
         )
       })}
     </nav>
@@ -82,7 +96,6 @@ function SidebarNav({ active, setActive }) {
 }
 
 export default function Sidebar() {
-  const [active, setActive] = useState('myDrive')
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
@@ -94,7 +107,7 @@ export default function Sidebar() {
   return (
     <>
       <aside className="fixed bottom-0 left-0 top-16 hidden w-60 flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 lg:flex">
-        <SidebarNav active={active} setActive={setActive} />
+        <SidebarNav />
         <StorageMeter />
       </aside>
 
@@ -118,7 +131,7 @@ export default function Sidebar() {
                 <X size={18} />
               </button>
             </div>
-            <SidebarNav active={active} setActive={setActive} />
+            <SidebarNav />
             <StorageMeter />
           </aside>
         </div>

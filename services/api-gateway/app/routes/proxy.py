@@ -1,4 +1,6 @@
+from __future__ import annotations
 import logging
+import re
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import Response
@@ -10,43 +12,94 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-ROUTE_MAP = {
-    "auth": "AUTH_SERVICE_URL",
-    "files": "FILE_SERVICE_URL",
-    "folders": "METADATA_SERVICE_URL",
-    "telegram": "TELEGRAM_SERVICE_URL",
-    "ai": "AI_SERVICE_URL",
-}
+# Matches: files/<uuid>/download
+_DOWNLOAD_RE = re.compile(r"^files/[^/]+/download$")
+
+# resolve_target_service routing rules (evaluated top-to-bottom, first match wins):
+#
+# path="files/upload",            method=POST,   params={}                  -> FILE_SERVICE_URL
+# path="files/abc/download",      method=GET,    params={}                  -> FILE_SERVICE_URL
+# path="files/abc",               method=DELETE, params={"permanent":"true"}-> FILE_SERVICE_URL
+# path="files/upload",            method=GET,    params={}                  -> METADATA_SERVICE_URL (*)
+# path="files",                   method=GET,    params={}                  -> METADATA_SERVICE_URL
+# path="files/abc",               method=GET,    params={}                  -> METADATA_SERVICE_URL
+# path="files/abc",               method=PATCH,  params={}                  -> METADATA_SERVICE_URL
+# path="files/abc",               method=DELETE, params={"permanent":"false"}-> METADATA_SERVICE_URL
+# path="folders",                 method=POST,   params={}                  -> METADATA_SERVICE_URL
+# path="folders/abc",             method=PATCH,  params={}                  -> METADATA_SERVICE_URL
+# path="views/trash",             method=GET,    params={}                  -> METADATA_SERVICE_URL
+# path="auth/signup",             method=POST,   params={}                  -> AUTH_SERVICE_URL
+# path="telegram/upload",         method=POST,   params={}                  -> TELEGRAM_SERVICE_URL
+# path="ai/chat",                 method=POST,   params={}                  -> AI_SERVICE_URL
+#
+# (*) Unlikely call but falls through to metadata correctly.
 
 
-def _resolve_service_url(prefix: str) -> str:
+def resolve_target_service(path: str, method: str, query_params: dict) -> str:
     settings = get_settings()
-    attr = ROUTE_MAP.get(prefix)
-    if attr is None:
+    m = method.upper()
+
+    # --- /files/* split routing ---
+    if path.startswith("files"):
+        # POST /files/upload -> file-service
+        if path == "files/upload":
+            selected = settings.FILE_SERVICE_URL
+            logger.debug("route: files/upload -> file-service")
+            return selected
+
+        # GET /files/{id}/download -> file-service
+        if _DOWNLOAD_RE.match(path):
+            selected = settings.FILE_SERVICE_URL
+            logger.debug("route: %s (download) -> file-service", path)
+            return selected
+
+        # DELETE /files/{id}?permanent=true -> file-service
+        if m == "DELETE" and query_params.get("permanent", "").lower() == "true":
+            selected = settings.FILE_SERVICE_URL
+            logger.debug("route: %s DELETE permanent=true -> file-service", path)
+            return selected
+
+        # Everything else (list, get, patch, soft-delete) -> metadata-service
+        logger.debug("route: %s %s -> metadata-service", m, path)
+        return settings.METADATA_SERVICE_URL
+
+    # --- simple prefix routing for all other paths ---
+    prefix = path.split("/")[0]
+
+    prefix_map: dict[str, str] = {
+        "auth": settings.AUTH_SERVICE_URL,
+        "folders": settings.METADATA_SERVICE_URL,
+        "views": settings.METADATA_SERVICE_URL,
+        "telegram": settings.TELEGRAM_SERVICE_URL,
+        "ai": settings.AI_SERVICE_URL,
+    }
+
+    url = prefix_map.get(prefix)
+    if url is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Unknown service prefix: {prefix}",
+            detail=f"Unknown service prefix: {prefix!r}",
         )
-    return getattr(settings, attr)
+    logger.debug("route: %s %s -> %s", m, path, url)
+    return url
 
 
 @router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(path: str, request: Request) -> Response:
-    parts = path.strip("/").split("/", 1)
-    prefix = parts[0]
-    remaining = parts[1] if len(parts) > 1 else ""
+    normalized = path.strip("/")
+    params = dict(request.query_params)
 
-    service_url = _resolve_service_url(prefix)
-    target_path = f"{prefix}/{remaining}" if remaining else prefix
+    service_url = resolve_target_service(normalized, request.method, params)
 
     headers = dict(request.headers)
-    params = dict(request.query_params)
     body = await request.body()
+
+    logger.info("proxy %s /%s -> %s", request.method, normalized, service_url)
 
     svc = ProxyService()
     upstream = await svc.forward_request(
         service_url=service_url,
-        path=target_path,
+        path=normalized,
         method=request.method,
         headers=headers,
         params=params,

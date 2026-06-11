@@ -23,14 +23,14 @@ function LoadingScreen() {
   )
 }
 
-function ProtectedDashboard() {
+function DashboardShell({ view }) {
   const { isAuthenticated, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/signin" replace />
   return (
     <>
       <Sidebar />
-      <Dashboard />
+      <Dashboard view={view} />
       <ChatBot />
     </>
   )
@@ -44,7 +44,6 @@ function HomeRedirect() {
 
 function AppShell() {
   const { loading } = useAuth()
-
   if (loading) return <LoadingScreen />
 
   return (
@@ -55,7 +54,10 @@ function AppShell() {
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/dashboard" element={<ProtectedDashboard />} />
+          <Route path="/dashboard" element={<DashboardShell view="myDrive" />} />
+          <Route path="/dashboard/recent" element={<DashboardShell view="recent" />} />
+          <Route path="/dashboard/starred" element={<DashboardShell view="starred" />} />
+          <Route path="/dashboard/trash" element={<DashboardShell view="trash" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
