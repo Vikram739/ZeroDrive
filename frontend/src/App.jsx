@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Navbar from './components/layout/Navbar'
@@ -30,7 +30,27 @@ function DashboardShell({ view }) {
   return (
     <>
       <Sidebar />
-      <Dashboard view={view} />
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <Dashboard view={view} />
+        <Footer />
+      </div>
+      <ChatBot />
+    </>
+  )
+}
+
+function DashboardFolderShell() {
+  const { isAuthenticated, loading } = useAuth()
+  const { folderId } = useParams()
+  if (loading) return <LoadingScreen />
+  if (!isAuthenticated) return <Navigate to="/signin" replace />
+  return (
+    <>
+      <Sidebar />
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <Dashboard view="myDrive" folderId={folderId} />
+        <Footer />
+      </div>
       <ChatBot />
     </>
   )
@@ -47,21 +67,37 @@ function AppShell() {
   if (loading) return <LoadingScreen />
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       <Navbar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1">
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+          <Route
+            path="/signin"
+            element={
+              <div className="flex flex-1 flex-col overflow-y-auto">
+                <SignIn />
+                <Footer />
+              </div>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <div className="flex flex-1 flex-col overflow-y-auto">
+                <SignUp />
+                <Footer />
+              </div>
+            }
+          />
           <Route path="/dashboard" element={<DashboardShell view="myDrive" />} />
           <Route path="/dashboard/recent" element={<DashboardShell view="recent" />} />
           <Route path="/dashboard/starred" element={<DashboardShell view="starred" />} />
           <Route path="/dashboard/trash" element={<DashboardShell view="trash" />} />
+          <Route path="/dashboard/folder/:folderId" element={<DashboardFolderShell />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
-      <Footer />
     </div>
   )
 }

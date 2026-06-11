@@ -31,9 +31,12 @@ def list_starred(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/recent", response_model=ListResponse)
-def list_recent(
-    limit: int = 20,
-    current_user: dict = Depends(get_current_user),
-):
+def list_recent(current_user: dict = Depends(get_current_user)):
     uid: str = current_user["uid"]
-    return FileService().get_recent(uid, limit=limit)
+    return FileService().get_recent(uid)
+
+
+@router.get("/search", response_model=ListResponse)
+def search(q: str = "", current_user: dict = Depends(get_current_user)):
+    uid: str = current_user["uid"]
+    return FileService().search(uid, q)

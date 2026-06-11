@@ -97,10 +97,12 @@ export default function SignUp() {
   const busy = submitting || googleLoading
 
   return (
-    <div className="grid flex-1 lg:grid-cols-2">
-      <AuthBrandPanel />
+    <div className="flex flex-1">
+      <div className="hidden w-[40%] shrink-0 sm:flex lg:w-1/2">
+        <AuthBrandPanel />
+      </div>
 
-      <div className="flex items-center justify-center px-6 py-12">
+      <div className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-12">
         <div className="w-full max-w-sm">
           <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
             {copy.title}
@@ -189,7 +191,7 @@ export default function SignUp() {
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-zinc-900 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-zinc-900 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {submitting ? <Loader size={16} className="animate-spin" /> : null}
               {copy.button}
@@ -209,7 +211,7 @@ export default function SignUp() {
             className="flex w-full items-center justify-center gap-2.5 rounded-md border border-zinc-300 bg-white py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
           >
             {googleLoading ? <Loader size={16} className="animate-spin" /> : <GoogleIcon />}
-            {content.auth.googleSignUp}
+            {copy.googleButton}
           </button>
 
           <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
