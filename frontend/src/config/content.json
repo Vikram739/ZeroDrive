@@ -71,7 +71,7 @@
     "starred": "Starred",
     "trash": "Trash",
     "storageLabel": "Storage",
-    "storageInfo": "0 GB of unlimited"
+    "storageInfo": "of unlimited"
   },
   "dashboard": {
     "heading": "My Drive",
@@ -82,10 +82,13 @@
       "buttonFile": "Upload file",
       "buttonFolder": "New folder"
     },
+    "emptyOtherTitle": "Nothing here yet",
     "actions": {
+      "open": "Open",
       "download": "Download",
       "rename": "Rename",
       "star": "Star",
+      "unstar": "Unstar",
       "trash": "Move to trash"
     },
     "columns": {
@@ -94,7 +97,37 @@
       "size": "Size",
       "actions": "Actions"
     },
-    "emptySize": "--"
+    "emptySize": "--",
+    "dialogs": {
+      "newFolder": {
+        "title": "Create new folder",
+        "placeholder": "Folder name",
+        "cancel": "Cancel",
+        "create": "Create"
+      },
+      "rename": {
+        "title": "Rename",
+        "cancel": "Cancel",
+        "save": "Save"
+      },
+      "confirmDelete": {
+        "title": "Move to trash?",
+        "subtitle": "You can restore it from the trash later.",
+        "cancel": "Cancel",
+        "confirm": "Move to trash"
+      }
+    },
+    "upload": {
+      "uploading": "Uploading...",
+      "complete": "Upload complete",
+      "failed": "Upload failed"
+    },
+    "toast": {
+      "folderCreated": "Folder created",
+      "fileUploaded": "File uploaded",
+      "movedToTrash": "Moved to trash",
+      "error": "Something went wrong"
+    }
   },
   "chatbot": {
     "title": "ZeroDrive AI",
