@@ -39,7 +39,22 @@
       "passwordMismatch": "Passwords do not match"
     },
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "googleSignIn": "Sign in with Google",
+    "googleSignUp": "Sign up with Google",
+    "orDivider": "or",
+    "errors": {
+      "emailInUse": "Email already registered",
+      "wrongPassword": "Incorrect password",
+      "userNotFound": "No account with this email",
+      "weakPassword": "Password must be at least 6 characters",
+      "invalidEmail": "Invalid email format",
+      "googlePopupClosed": "Sign-in cancelled",
+      "generic": "Something went wrong. Please try again."
+    }
+  },
+  "loading": {
+    "authCheck": "Checking authentication..."
   },
   "navbar": {
     "searchPlaceholder": "Search your files...",

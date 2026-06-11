@@ -44,7 +44,7 @@ function getAvatarColor(name) {
 }
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
   const navigate = useNavigate()
@@ -64,9 +64,13 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [menuOpen])
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setMenuOpen(false)
-    logout()
+    try {
+      await signOut()
+    } catch {
+      // ignore sign-out errors
+    }
     navigate('/signin')
   }
 
@@ -155,11 +159,18 @@ export default function Navbar() {
                 type="button"
                 onClick={() => setMenuOpen((prev) => !prev)}
                 aria-label="Account menu"
-                className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-medium text-white ${getAvatarColor(
-                  user.name
-                )}`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-medium text-white ${user.photoURL ? '' : getAvatarColor(user.name)}`}
               >
-                {getInitials(user.name)}
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.name}
+                    className="h-full w-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  getInitials(user.name)
+                )}
               </button>
 
               {menuOpen && (
