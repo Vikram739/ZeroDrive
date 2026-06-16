@@ -222,7 +222,7 @@ __marimo__/
 
 
 # Secrets
-**/secrets/
+**/secrets/*.json
 **/firebase-admin-key.json
 **/*.env
 **/.env.local
