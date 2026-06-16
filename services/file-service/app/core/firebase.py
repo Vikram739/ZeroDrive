@@ -1,5 +1,7 @@
 from __future__ import annotations
+import json
 import logging
+import os
 
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
@@ -17,7 +19,11 @@ def initialize_firebase() -> None:
     if _app is not None:
         return
     settings = get_settings()
-    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+    json_str = os.environ.get("FIREBASE_CREDENTIALS_JSON", "").strip()
+    if json_str:
+        cred = credentials.Certificate(json.loads(json_str))
+    else:
+        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
     _app = firebase_admin.initialize_app(cred)
     logger.info("Firebase Admin SDK initialized (file-service)")
 

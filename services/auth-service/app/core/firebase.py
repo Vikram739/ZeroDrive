@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
@@ -13,7 +15,11 @@ def initialize_firebase() -> None:
     if firebase_admin._apps:
         return
     settings = get_settings()
-    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+    json_str = os.environ.get("FIREBASE_CREDENTIALS_JSON", "").strip()
+    if json_str:
+        cred = credentials.Certificate(json.loads(json_str))
+    else:
+        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
     firebase_admin.initialize_app(cred)
     logger.info("Firebase Admin SDK initialized")
 
