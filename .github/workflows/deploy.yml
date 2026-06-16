@@ -1,0 +1,21 @@
+name: Deploy to Oracle VM
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-backend:
+    name: Deploy backend services
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH into VM and redeploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ${{ secrets.ORACLE_USER }}
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.ORACLE_USER }}/ZeroDrive
+            git pull origin main
+            docker compose up -d --build
