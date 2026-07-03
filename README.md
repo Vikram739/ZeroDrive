@@ -1,6 +1,6 @@
 # ZeroDrive
 
-Unlimited free cloud storage powered by Telegram as the storage backend. Upload any file up to 5 GB, organize with folders, search, star, and share -- all stored on Telegram's infrastructure at no cost.
+Unlimited free cloud storage powered by Telegram as the storage backend. Upload any file up to 5 GB, organize with folders, search, star, and share -- all stored on Telegram's infrastructure at zero cost.
 
 ## How It Works
 
