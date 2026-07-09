@@ -1,0 +1,25 @@
+name: Keep Render Services Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping health endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping all services
+        run: |
+          urls=(
+            "https://zerodrive-api.onrender.com/health"
+            "https://zerodrive-telegram.onrender.com/health"
+            "https://zerodrive-auth.onrender.com/health"
+            "https://zerodrive-file.onrender.com/health"
+            "https://zerodrive-metadata.onrender.com/health"
+          )
+          for url in "${urls[@]}"; do
+            echo "Pinging $url"
+            curl -sS -o /dev/null -w "%{http_code}\n" --max-time 20 "$url" || echo "Failed: $url"
+          done
